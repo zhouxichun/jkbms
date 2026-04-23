@@ -1,7 +1,7 @@
-const noble = require('@abandonware/noble');
-const EventEmitter = require('events');
+import noble from '@abandonware/noble';
+import EventEmitter from 'events';
 
-class JKBMS extends EventEmitter {
+export default class JKBMS extends EventEmitter {
     constructor() {
         super();
 
@@ -15,6 +15,8 @@ class JKBMS extends EventEmitter {
         };
 
         this.peripheral = null;
+        this.address = null;
+        this.localName = null;
         this.targetCharacteristic = null;
         this.isInited = false;
         this.initData = null;
@@ -22,7 +24,6 @@ class JKBMS extends EventEmitter {
         this.deviceInfo = null;
         this.extentInfo = null;
         this.cellInfo = null;
-        this.extentInfo = null;
 
         noble.on( 'stateChange', state => {
             if( state === 'poweredOn' ) {
@@ -37,10 +38,12 @@ class JKBMS extends EventEmitter {
 
         noble.on('discover', peripheral => { 
             if( !peripheral ) return;
-            console.log(`discoverd：${ peripheral.address} | ${ peripheral.advertisement.localName}` );
+            this.address = peripheral.address;
+            this.localName = peripheral.advertisement?.localName;
+            console.log(`discoverd: ${ this.address} | ${ this.localName}` );
             this.peripheral = peripheral;
-            this.peripheral.on('disconnect', () => console.log('disconnected'));
-            this.emit( 'discoverd：' );
+            this.peripheral.on('disconnect', reason => console.log('disconnected',reason));
+            this.emit( 'discoverd' );
             noble.stopScanning();
         });
     }
@@ -50,9 +53,11 @@ class JKBMS extends EventEmitter {
         console.log(`connecting...` );
 
         this.peripheral.connect( err => {
-            if( err ) return;
-
-            console.log(`connected: ${ this.peripheral.address} | ${ this.peripheral.advertisement.localName}` );
+            if( err ) {
+                console.error( err );
+                return;
+            };
+            console.log(`connected` );
             const serviceUUIDs = [ this.config.SERVICE_UUID ];
             const characteristicUUIDs = [ this.config.CHARACTERISTIC_UUID ];
 
@@ -86,7 +91,7 @@ class JKBMS extends EventEmitter {
 
     sendCommand( cmdBuffer ) {
         if ( !this.targetCharacteristic ) return;
-        this.targetCharacteristic.write(cmdBuffer, false, err => {
+        this.targetCharacteristic.write(cmdBuffer, true, err => {
             err ? console.error('Failure sending：', err) : console.log('Send：', cmdBuffer.toString('hex'));    
         });
     }
@@ -97,7 +102,9 @@ class JKBMS extends EventEmitter {
         }else if( hexStr.startsWith( this.config.ACK_PREFIX ) ){            //收到ACK消息，初始化完成
             console.log( 'inited ' )
             this.isInited = true;
-            this.sendCommand( this.config.CMD_CELL );
+            setTimeout(() => {
+                this.sendCommand( this.config.CMD_CELL );
+            }, 1000);
         }else{
             this.initData += hexStr;
         };
@@ -185,9 +192,6 @@ class JKBMS extends EventEmitter {
             short_circuit_protect_delay: buffer.readInt32LE(134),    //短路保护延时 微秒, 1500
             v_balance_start: buffer.readInt32LE(138),                //均衡启动电压, 0.001V, 3000
         }
-
-        //console.log( this.extentInfo );
-
         this.emit('extent-info', this.extentInfo);
     }
 
@@ -220,8 +224,6 @@ class JKBMS extends EventEmitter {
         this.cellInfo.t_device  = buffer.readInt16LE( 144 );
         this.cellInfo.t_sensor1  =  buffer.readInt16LE( 162 );
         this.cellInfo.t_sensor2  = buffer.readInt16LE( 164 );
-        //console.log( this.cellInfo );
-
         this.emit('cells-info', this.cellInfo);
     }
 
@@ -231,5 +233,3 @@ class JKBMS extends EventEmitter {
         }
     }
 }
-
-module.exports = JKBMS;
