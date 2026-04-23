@@ -1,4 +1,5 @@
 # jkbms
+极空保护板蓝牙BLE连接
 Read data and config from JKBMS via BLE.
 
 #support:
