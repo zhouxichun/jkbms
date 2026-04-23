@@ -1,7 +1,14 @@
 import noble from '@abandonware/noble';
+import { info } from 'console';
 import EventEmitter from 'events';
 
 export default class JKBMS extends EventEmitter {
+    static EVENTS = {
+        DISCOVERD: 'discoverd',
+        DEVICE_INFO:'device_info',
+        EXTENT_INFO: 'extent_info',
+        CELLS_INFO: 'cells_info'
+    }
     constructor() {
         super();
 
@@ -43,7 +50,7 @@ export default class JKBMS extends EventEmitter {
             console.log(`discoverd: ${ this.address} | ${ this.localName}` );
             this.peripheral = peripheral;
             this.peripheral.on('disconnect', reason => console.log('disconnected',reason));
-            this.emit( 'discoverd' );
+            this.emit( JKBMS.EVENTS.DISCOVERD );
             noble.stopScanning();
         });
     }
@@ -150,9 +157,7 @@ export default class JKBMS extends EventEmitter {
             vendor: buffer.slice(101,118).toString('ascii').replace(/\x00/g, ''),
             setupcode: buffer.slice(118,128).toString('ascii').replace(/\x00/g, ''),
         };
-
-        //console.log( this.deviceInfo );
-        this.emit( 'device-info', this.deviceInfo );
+        this.emit( JKBMS.EVENTS.DEVICE_INFO, this.deviceInfo );
     }
 
     parseExtentInfo( hexStr ){
@@ -192,7 +197,7 @@ export default class JKBMS extends EventEmitter {
             short_circuit_protect_delay: buffer.readInt32LE(134),    //短路保护延时 微秒, 1500
             v_balance_start: buffer.readInt32LE(138),                //均衡启动电压, 0.001V, 3000
         }
-        this.emit('extent-info', this.extentInfo);
+        this.emit(JKBMS.EVENTS.EXTENT_INFO, this.extentInfo);
     }
 
     parseCellInfo( hexStr ){
@@ -224,7 +229,7 @@ export default class JKBMS extends EventEmitter {
         this.cellInfo.t_device  = buffer.readInt16LE( 144 );
         this.cellInfo.t_sensor1  =  buffer.readInt16LE( 162 );
         this.cellInfo.t_sensor2  = buffer.readInt16LE( 164 );
-        this.emit('cells-info', this.cellInfo);
+        this.emit(JKBMS.EVENTS.CELLS_INFO, this.cellInfo);
     }
 
     disconnect(){
